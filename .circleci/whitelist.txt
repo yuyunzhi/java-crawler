@@ -1,2 +1,0 @@
-src/main/java/com/github/hcsp/io/FileAccessor.java
-pom.xml
