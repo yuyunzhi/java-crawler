@@ -9,6 +9,7 @@ import org.apache.http.util.EntityUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -18,6 +19,7 @@ import java.sql.SQLException;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Main {
     private static final String USER_NAME = "root";
@@ -30,7 +32,7 @@ public class Main {
         String currentHandleLink;
         // 从数据库里取出待处理的一条link 能加载到就进入循环，且取出后在数据库里删除这条link
         // 第一次进去会默认有一个初始化url的，配置在 db/migration/V2__Init_data.sql
-        while ((currentHandleLink=getNextLinkThenDelete(connection))!=null) {
+        while ((currentHandleLink = getNextLinkThenDelete(connection)) != null) {
 
             // 询问数据库LINKS_ALREADY_PROCESSED，当前链接是否被处理过了？即是否在里面
             if (isLinkProcessed(connection, currentHandleLink)) {
@@ -44,7 +46,7 @@ public class Main {
                 parseUrlFromPageAndStoreIntoDatabase(connection, doc);
 
                 // 如果这是一个新闻页面，就提取新闻内容页面的数据存入数据库中 NEWS
-                saveDataBaseIfItIsNewsPage(doc);
+                saveDataBaseIfItIsNewsPage(connection, doc, currentHandleLink);
 
                 // 处理完连接后，把处理的这条链接放入数据库中 LINKS_ALREADY_PROCESSED
                 updateLinkIntoDatabase(connection, currentHandleLink, "insert into LINKS_ALREADY_PROCESSED (link) values(?)");
@@ -70,8 +72,14 @@ public class Main {
     private static void parseUrlFromPageAndStoreIntoDatabase(Connection connection, Document doc) throws SQLException {
         for (Element aTag : doc.select("a")) {
             String href = aTag.attr("href");
-            System.out.println("href = " + href);
-            updateLinkIntoDatabase(connection, href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
+            //System.out.println("href = " + href);
+            if (href.startsWith("//")) {
+                href = "https:" + href;
+            }
+
+            if (!href.toLowerCase().startsWith("javascript")) {
+                updateLinkIntoDatabase(connection, href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
+            }
         }
     }
 
@@ -116,21 +124,29 @@ public class Main {
         return null;
     }
 
-    private static void saveDataBaseIfItIsNewsPage(Document doc) {
+    private static void saveDataBaseIfItIsNewsPage(Connection connection, Document doc, String link) throws SQLException {
         ArrayList<Element> articleTags = doc.select("article");
         if (!articleTags.isEmpty()) {
             for (Element articleTag : articleTags) {
                 String title = articleTags.get(0).child(0).text();
-                System.out.println("title = " + title);
-            }
+                ArrayList<Element> paragraphs = articleTag.select("p");
+                String content = paragraphs.stream().map(Element::text).collect(Collectors.joining("\n"));
 
+                try (PreparedStatement statement = connection.prepareStatement("insert into news (url,content,title,created_at,modified_at) values(?,?,?,now(),now())")) {
+                     statement.setString(1, link);
+                     statement.setString(2, content);
+                     statement.setString(3, title);
+                     statement.executeUpdate();
+                }
+            System.out.println("link = " + link);
+            System.out.println("title = " + title);
         }
+
     }
 
+}
+
     private static Document getHttpAndParseHtml(String link) throws IOException {
-        if (link.startsWith("//")) {
-            link = "https:" + link;
-        }
 
         CloseableHttpClient httpclient = HttpClients.createDefault();
 
