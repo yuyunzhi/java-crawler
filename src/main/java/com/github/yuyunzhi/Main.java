@@ -27,31 +27,18 @@ public class Main {
 
         Connection connection = DriverManager.getConnection("jdbc:h2:file:/Users/yuyunzhi/Desktop/java-crawler/crawler", USER_NAME, PASS_WORD);
 
-        while (true) {
-
-            // 待处理的链接池  第一次进去会默认有一个初始化url的，配置在 db/migration/V2__Init_data.sql
-            List<String> linkPool = loadUrlsFromDatabase(connection, "select link from LINKS_TO_BE_PROCESSED");
-
-            if (linkPool.isEmpty()) {
-                System.out.println("待处理的链接池已经处理完毕，结束抓取");
-                break;
-            }
-
-            String link = linkPool.remove(linkPool.size() - 1);
-            try (PreparedStatement statement = connection.prepareStatement("delete from LINKS_TO_BE_PROCESSED where link = ?")) {
-                statement.setString(1, link);
-                statement.executeUpdate();
-            }
-
+        String currentHandleLink;
+        // 从数据库里取出待处理的一条link 能加载到就进入循环，且取出后在数据库里删除这条link
+        // 第一次进去会默认有一个初始化url的，配置在 db/migration/V2__Init_data.sql
+        while ((currentHandleLink=getNextLinkThenDelete(connection))!=null) {
 
             // 询问数据库LINKS_ALREADY_PROCESSED，当前链接是否被处理过了？即是否在里面
-            if (isLinkProcessed(connection, link)) {
+            if (isLinkProcessed(connection, currentHandleLink)) {
                 continue;
             }
 
-
-            if (isInterestingLink(link)) {
-                Document doc = getHttpAndParseHtml(link);
+            if (isInterestingLink(currentHandleLink)) {
+                Document doc = getHttpAndParseHtml(currentHandleLink);
 
                 // 解析获取的页面的link，并把解析后的link存到数据库 LINKS_TO_BE_PROCESSED
                 parseUrlFromPageAndStoreIntoDatabase(connection, doc);
@@ -60,7 +47,7 @@ public class Main {
                 saveDataBaseIfItIsNewsPage(doc);
 
                 // 处理完连接后，把处理的这条链接放入数据库中 LINKS_ALREADY_PROCESSED
-                insertLinkIntoDatabase(connection, link, "insert into LINKS_ALREADY_PROCESSED (link) values(?)");
+                updateLinkIntoDatabase(connection, currentHandleLink, "insert into LINKS_ALREADY_PROCESSED (link) values(?)");
 
             }
         }
@@ -68,11 +55,23 @@ public class Main {
 
     }
 
+    private static String getNextLinkThenDelete(Connection connection) throws SQLException {
+        String currentHandleLink = getNextLinkFromDatabase(connection, "select link from LINKS_TO_BE_PROCESSED limit 1");
+
+        if (currentHandleLink == null) {
+            System.out.println("待处理的链接池已经处理完毕，结束抓取");
+            return null;
+        }
+        // 从数据库里删除该link
+        updateLinkIntoDatabase(connection, currentHandleLink, "delete from LINKS_TO_BE_PROCESSED where link = ?");
+        return currentHandleLink;
+    }
+
     private static void parseUrlFromPageAndStoreIntoDatabase(Connection connection, Document doc) throws SQLException {
         for (Element aTag : doc.select("a")) {
             String href = aTag.attr("href");
             System.out.println("href = " + href);
-            insertLinkIntoDatabase(connection, href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
+            updateLinkIntoDatabase(connection, href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
         }
     }
 
@@ -85,36 +84,36 @@ public class Main {
                 return true;
             }
         } finally {
-            if(resultSet != null) {
+            if (resultSet != null) {
                 resultSet.close();
             }
         }
         return false;
     }
 
-    private static void insertLinkIntoDatabase(Connection connection, String link, String sql) throws SQLException {
+    private static void updateLinkIntoDatabase(Connection connection, String link, String sql) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, link);
             statement.executeUpdate();
         }
     }
 
-    private static List<String> loadUrlsFromDatabase(Connection connection, String sql) throws SQLException {
-        List<String> results = new ArrayList<>();
+    private static String getNextLinkFromDatabase(Connection connection, String sql) throws SQLException {
+        List<String> results = null;
         ResultSet resultSet = null;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             resultSet = statement.executeQuery();
 
             while (resultSet.next()) {
-                results.add(resultSet.getString(1));
+                return resultSet.getString(1);
             }
 
         } finally {
-            if(resultSet != null) {
+            if (resultSet != null) {
                 resultSet.close();
             }
         }
-        return results;
+        return null;
     }
 
     private static void saveDataBaseIfItIsNewsPage(Document doc) {
