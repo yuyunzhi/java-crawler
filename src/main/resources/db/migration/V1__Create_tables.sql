@@ -1,10 +1,10 @@
 create table news(
-id bigint primary key auto_increment,
-title text,
-content text,
-url text,
-created_at timestamp,
-modified_at timestamp
+    id bigint primary key auto_increment,
+    title text,
+    content text,
+    url text,
+    created_at timestamp default now(),
+    modified_at timestamp default now()
 );
 
 create table LINKS_TO_BE_PROCESSED (link text);
