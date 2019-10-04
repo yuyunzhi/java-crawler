@@ -15,7 +15,8 @@ public class JdbcCrawlerDao implements CrawlerDAO {
         }
 
     }
-    public String getNextLinkFromDatabase(String sql) throws SQLException {
+
+    private String getNextLinkFromDatabase(String sql) throws SQLException {
         ResultSet resultSet = null;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             resultSet = statement.executeQuery();
@@ -31,26 +32,41 @@ public class JdbcCrawlerDao implements CrawlerDAO {
         }
         return null;
     }
+
     public String getNextLinkThenDelete() throws SQLException {
-        String currentHandleLink = getNextLinkFromDatabase( "select link from LINKS_TO_BE_PROCESSED limit 1");
+        String currentHandleLink = getNextLinkFromDatabase("select link from LINKS_TO_BE_PROCESSED limit 1");
 
         if (currentHandleLink == null) {
             System.out.println("待处理的链接池已经处理完毕，结束抓取");
             return null;
         }
         // 从数据库里删除该link
-        updateLinkIntoDatabase( currentHandleLink, "delete from LINKS_TO_BE_PROCESSED where link = ?");
+        updateLinkIntoDatabase(currentHandleLink);
         return currentHandleLink;
     }
 
-    public void updateLinkIntoDatabase(String link, String sql) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+    public void updateLinkIntoDatabase(String link) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("delete from LINKS_TO_BE_PROCESSED where link = ?")) {
             statement.setString(1, link);
             statement.executeUpdate();
         }
     }
 
-    public void insertNewsIntoDatabase(String url,String content,String title) throws SQLException {
+    public void insertProcessedLink(String link) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("insert into LINKS_ALREADY_PROCESSED (link) values(?)")) {
+            statement.setString(1, link);
+            statement.executeUpdate();
+        }
+    }
+
+    public void insertToBeProcessedLink(String link) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("insert into LINKS_TO_BE_PROCESSED (link) values(?)")) {
+            statement.setString(1, link);
+            statement.executeUpdate();
+        }
+    }
+
+    public void insertNewsIntoDatabase(String url, String content, String title) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("insert into news (url,content,title,created_at,modified_at) values(?,?,?,now(),now())")) {
             statement.setString(1, url);
             statement.setString(2, content);

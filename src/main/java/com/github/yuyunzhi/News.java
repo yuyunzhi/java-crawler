@@ -6,6 +6,12 @@ public class News {
     private String title;
     private String url;
 
+    public News(String content, String title, String url) {
+        this.content = content;
+        this.title = title;
+        this.url = url;
+    }
+
     public String getId() {
         return id;
     }

@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 public class Crawler {
 
-    private CrawlerDAO dao = new JdbcCrawlerDao();
+    private CrawlerDAO dao = new MybatisCrawlerDao();
 
     public static void main(String[] args) throws IOException, SQLException {
         new Crawler().run();
@@ -41,32 +41,30 @@ public class Crawler {
                 parseUrlFromPageAndStoreIntoDatabase(doc);
 
                 // 如果这是一个新闻页面，就提取新闻内容页面的数据存入数据库中 NEWS
-                saveDataBaseIfItIsNewsPage( doc, currentHandleLink);
+                saveDataBaseIfItIsNewsPage(doc, currentHandleLink);
 
                 // 处理完连接后，把处理的这条链接放入数据库中 LINKS_ALREADY_PROCESSED
-                dao.updateLinkIntoDatabase(currentHandleLink, "insert into LINKS_ALREADY_PROCESSED (link) values(?)");
+                dao.insertProcessedLink(currentHandleLink);
+
             }
         }
     }
 
 
-
-
-    private void parseUrlFromPageAndStoreIntoDatabase( Document doc) throws SQLException {
+    private void parseUrlFromPageAndStoreIntoDatabase(Document doc) throws SQLException {
         for (Element aTag : doc.select("a")) {
             String href = aTag.attr("href");
-            //System.out.println("href = " + href);
             if (href.startsWith("//")) {
                 href = "https:" + href;
             }
-
             if (!href.toLowerCase().startsWith("javascript")) {
-                dao.updateLinkIntoDatabase( href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
+                dao.insertToBeProcessedLink(href);
+               // dao.updateLinkIntoDatabase(href, "insert into LINKS_TO_BE_PROCESSED (link) values(?)");
             }
         }
     }
 
-    private void saveDataBaseIfItIsNewsPage( Document doc, String link) throws SQLException {
+    private void saveDataBaseIfItIsNewsPage(Document doc, String link) throws SQLException {
         ArrayList<Element> articleTags = doc.select("article");
         if (!articleTags.isEmpty()) {
             for (Element articleTag : articleTags) {
@@ -74,14 +72,14 @@ public class Crawler {
                 ArrayList<Element> paragraphs = articleTag.select("p");
                 String content = paragraphs.stream().map(Element::text).collect(Collectors.joining("\n"));
 
-                dao.insertNewsIntoDatabase(link,content,title);
-            System.out.println("link = " + link);
-            System.out.println("title = " + title);
+                dao.insertNewsIntoDatabase(link, content, title);
+                System.out.println("link = " + link);
+                System.out.println("title = " + title);
+            }
+
         }
 
     }
-
-}
 
     private static Document getHttpAndParseHtml(String link) throws IOException {
 

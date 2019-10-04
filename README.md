@@ -9,10 +9,11 @@
 
 
 ### 2、项目技术栈
-- CircleCI，持续集成、单元测试、冒烟测试
+- CircleCI，持续集成
 - Jsoup解析HTML
 - 代码重构：方法抽离
 - spotBug bug自动检查工具
+- 使用Mybatis
 
 ### 3、确定算法
 
