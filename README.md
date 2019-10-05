@@ -14,9 +14,8 @@
 - 代码检测插件 maven-checkstyle-plugin
 - 自动bug检查插件 SpotBug bug
 - 持续集成，CircleCI
-- 
-- 使用Mybatis做ORM关系映射
 - Docker安装Mysql
+- 使用Mybatis做ORM关系映射
 - 代码重构：方法抽离、DAO（JDBC连接、Mybatis连接）
 
 ### 3、确定算法
