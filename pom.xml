@@ -58,6 +58,12 @@
             <artifactId>mybatis</artifactId>
             <version>3.5.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/mysql/mysql-connector-java -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.17</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -67,7 +73,10 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>5.2.4</version>
                 <configuration>
-                    <url>jdbc:h2:file:/Users/yuyunzhi/Desktop/java-crawler/crawler</url>
+                    <!--h2-->
+                    <!--<url>jdbc:h2:file:/Users/yuyunzhi/Desktop/java-crawler/crawler</url>-->
+                   <!--mysql-->
+                    <url>jdbc:mysql://localhost:3306/crawler</url>
                     <user>root</user>
                     <password>root</password>
                 </configuration>
