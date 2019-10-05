@@ -28,12 +28,11 @@ public class MybatisCrawlerDao implements CrawlerDAO {
     }
 
     @Override
-    public String getNextLinkThenDelete() throws SQLException {
+    public synchronized String getNextLinkThenDelete() throws SQLException {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             String link = session.selectOne("com.github.yuyunzhi.MyMapper.selectNextAvailableLink");
             if(link !=null){
                 session.delete("com.github.yuyunzhi.MyMapper.deleteLink",link);
-
             }
             return link;
         }

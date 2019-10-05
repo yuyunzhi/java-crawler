@@ -15,39 +15,45 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 
-public class Crawler {
+public class Crawler extends Thread {
 
-    private CrawlerDAO dao = new MybatisCrawlerDao();
+    private CrawlerDAO dao;
 
-    public static void main(String[] args) throws IOException, SQLException {
-        new Crawler().run();
+    public Crawler(CrawlerDAO dao) {
+        this.dao = new MybatisCrawlerDao();
     }
 
-    public void run() throws SQLException, IOException {
-        String currentHandleLink;
-        // 从数据库里取出待处理的一条link 能加载到就进入循环，且取出后在数据库里删除这条link
-        // 第一次进去会默认有一个初始化url的，配置在 db/migration/V2__Init_data.sql
-        while ((currentHandleLink = dao.getNextLinkThenDelete()) != null) {
+    @Override
+    public void run(){
+        try{
+            String currentHandleLink;
+            // 从数据库里取出待处理的一条link 能加载到就进入循环，且取出后在数据库里删除这条link
+            // 第一次进去会默认有一个初始化url的，配置在 db/migration/V2__Init_data.sql
+            while ((currentHandleLink = dao.getNextLinkThenDelete()) != null) {
 
-            // 询问数据库LINKS_ALREADY_PROCESSED，当前链接是否被处理过了？即是否在里面
-            if (dao.isLinkProcessed(currentHandleLink)) {
-                continue;
+                // 询问数据库LINKS_ALREADY_PROCESSED，当前链接是否被处理过了？即是否在里面
+                if (dao.isLinkProcessed(currentHandleLink)) {
+                    continue;
+                }
+
+                if (isInterestingLink(currentHandleLink)) {
+                    Document doc = getHttpAndParseHtml(currentHandleLink);
+
+                    // 解析获取的页面的link，并把解析后的link存到数据库 LINKS_TO_BE_PROCESSED
+                    parseUrlFromPageAndStoreIntoDatabase(doc);
+
+                    // 如果这是一个新闻页面，就提取新闻内容页面的数据存入数据库中 NEWS
+                    saveDataBaseIfItIsNewsPage(doc, currentHandleLink);
+
+                    // 处理完连接后，把处理的这条链接放入数据库中 LINKS_ALREADY_PROCESSED
+                    dao.insertProcessedLink(currentHandleLink);
+
+                }
             }
-
-            if (isInterestingLink(currentHandleLink)) {
-                Document doc = getHttpAndParseHtml(currentHandleLink);
-
-                // 解析获取的页面的link，并把解析后的link存到数据库 LINKS_TO_BE_PROCESSED
-                parseUrlFromPageAndStoreIntoDatabase(doc);
-
-                // 如果这是一个新闻页面，就提取新闻内容页面的数据存入数据库中 NEWS
-                saveDataBaseIfItIsNewsPage(doc, currentHandleLink);
-
-                // 处理完连接后，把处理的这条链接放入数据库中 LINKS_ALREADY_PROCESSED
-                dao.insertProcessedLink(currentHandleLink);
-
-            }
+        }catch(Exception e){
+            throw new RuntimeException(e);
         }
+
     }
 
 
@@ -74,7 +80,6 @@ public class Crawler {
 
                 dao.insertNewsIntoDatabase(link, content, title);
                 System.out.println("link = " + link);
-                System.out.println("title = " + title);
             }
 
         }
